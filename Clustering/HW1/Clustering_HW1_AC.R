@@ -6,7 +6,7 @@ library(readr)
 library(wordcloud)
 library(ggmap)
 
-####------------------------Load Data Sets-------------------####
+####------------------------Load Data Sets--------------------####
 
 listing_k<-read_csv("listing_k.csv")
 reviews <- read_csv("reviews.csv")
