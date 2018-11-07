@@ -6,8 +6,6 @@ library(readr)
 library(wordcloud)
 library(ggmap)
 
-setwd("/Users/anniecooper/Documents/MSA_2019/Fall 3/Clustering/Project 1/boston-airbnb-open-data")
-
 ####------------------------Load Data Sets-------------------####
 
 listing_k<-read_csv("listing_k.csv")
