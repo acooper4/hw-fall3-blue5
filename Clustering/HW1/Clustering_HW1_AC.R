@@ -8,10 +8,33 @@ library(ggmap)
 
 ####------------------------Load Data Sets----------------------####
 
-listing_k<-read_csv("listing_k.csv")
-reviews <- read_csv("reviews.csv")
-calendar<-read_csv("calendar.csv")
-load(file="map.RData")
+listing_k<-read_csv("Clustering/HW1/listing_k.csv")
+listing_m<-read_csv("Clustering/HW1/listing_m.csv")
+reviews <- read_csv("Clustering/HW1/reviews.csv")
+calendar<-read_csv("Clustering/HW1/calendar.csv")
+load(file="Clustering/HW1/map.RData")
+
+####----------------------Heat Map of Listings in Boston--------------------####
+
+ggmap(map, extent = "device") + 
+  geom_density2d(data = listing_m, aes(x = lon, y =lat), 
+                 size = 0.3) +
+  stat_density2d(data = listing_m, aes(x = lon, y = lat, 
+                                         fill = ..level.., alpha = ..level..), size = 0.01, 
+                 bins = 16, geom = "polygon") + 
+  scale_fill_gradient(low = "black", high = "red",name = "Density") + 
+  scale_alpha(range = c(0,0.3), guide = FALSE) +
+  ggtitle("Density Distribution of Airbnb Properties in Boston")
+
+####-------------------Price per Bed in Boston----------------####
+
+circle_size <- 0.015
+
+ggmap(map, extent = "device") + geom_point(aes(x=lon, y=lat), 
+                                              data=listing_m, col="purple", alpha=0.1,
+                                              size=listing_m$price_bed*circle_size) +
+  scale_size_continuous(range=range(listing_m$price_bed)) +
+  ggtitle("Price per Bed of Airbnb Properties in Boston")
 
 ####----------------Score Reviews and Create Clusters------------####
 
@@ -126,3 +149,5 @@ wordcloud(words = words5$word, freq = words4$n, min.freq = 150,
           max.words=100, random.order=FALSE, rot.per=0.35, 
           colors=brewer.pal(8, "Dark2"))
 
+
+####------------------
