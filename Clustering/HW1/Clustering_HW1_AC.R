@@ -5,6 +5,7 @@ library(text2vec)
 library(readr)
 library(wordcloud)
 library(ggmap)
+library(factoextra)
 
 ##########################################################################################
 # DATA PREPARATION
@@ -32,7 +33,7 @@ listings_subset <- listing_k2
 # Add price, #beds, price per bed, distance to attractions, rating, location rating, #reviews
 listings_subset <- listings_subset %>% 
   mutate(price=listings$newprice, beds=listings$beds, price_bed=round(listings$newprice/beds,2)) %>%
-  mutate(rating=listings$review_scores_rating, rating_loc=listings$review_scores_location, reviews_count=listings$number_of_reviews) %>%
+  mutate(rating=listings$review_scores_rating, reviews_month=listings$reviews_per_month, reviews_count=listings$number_of_reviews) %>%
   mutate(property_type=listings$property_type, room_type=listings$room_type, accommodates=listings$accommodates) %>%
   filter(!is.na(price_bed)) %>%               # remove null price/beds (removes 9 observations)
   filter(beds!=0) %>%                         # remove 0 beds (removes 4 observations)
@@ -81,6 +82,7 @@ hist(sentiment$avgsscore)
 
 # Add average scores to listings_subset
 combined <- listings_subset %>% left_join(sentiment,"listing_id")
+combined_original <- listings_subset %>% left_join(sentiment,"listing_id")
 
 # Scale variables
 combined$std.lat <- combined$lat
@@ -88,26 +90,16 @@ combined$std.lon <- combined$lon
 combined$std.price_bed <- combined$price_bed
 combined$std.beds <- combined$beds
 combined$std.rating <- combined$rating
-combined$std.rating_loc <- combined$rating_loc
 combined$std.avgsscore <- combined$avgsscore
+combined$std.reviews_month <- combined$reviews_month
 combined$std.reviews_count <- combined$reviews_count
 combined$std.accommodates <- combined$accommodates
 combined <- combined %>%
   mutate_at(vars(4:13,26:34), funs(scale))
 
-# CHOOSE WHAT TO CLUSTER BY INPUTTING THE VARIABLE INDEX FROM "COMBINED"
-# View column names
-colnames(combined)
-c_all <- cbind(combined[,c(4:13,26:33)])               # lat, lon, dist to attractions, price_bed, rating, rating_loc, avgsscore, reviews_count
-c_sentiment <- cbind(combined[,c(4:13,26:27,32)])      # lat, lon, avgsscore, dist to attractions
-c_sentiment2 <- cbind(combined[,32])                   # avgsscore
-c_rating <- cbind(combined[,c(26:28,30,31)])           # lat, lon, price_bed, rating, rating_loc
-c_rating2 <- cbind(combined[,c(30)])                   # rating, rating_loc
-c_attract <- cbind(combined[,c(4:13,26:28)])           # lat, lon, dist to attractions, price_bed
-
 
 ##############################################################################################
-# CLUSTERING FUNCTIONS
+# HIERARCHICAL CLUSTERING FUNCTIONS
 ##############################################################################################
 
 ####---------------------------Function for Creating Clusters-----------------------------####
@@ -120,7 +112,7 @@ create_clusters <- function (clustername){
   #clusters.s <- hclust(dist(c_all), method="single")
   #clusters.a <- hclust(dist(c_all), method="average")
 
-  # Plot clusters
+  # Dendrogram
   plot(clusters.c)
   #plot(clusters.s)
   #plot(clusters.a)
@@ -129,24 +121,26 @@ create_clusters <- function (clustername){
   
 }
 
+####----------------------Function for Determining Optimal Cluster Number (WSS)--------------####
+
+complete_Clust<-function(x,k){
+  return(hcut(x,k, hc_method ="complete" , hc_metric="euclidian"))
+}
+
+optimal_clusters <- function(clustername){
+  fviz_nbclust(as.matrix(clustername), complete_Clust, method = "wss")
+}
+
 ####---------------------------------Function for Pruning Clusters-------------------------####
 
-# Create function to prune dendrogram (up to 11)
+# Create function to prune dendrogram
 prune_clusters <- function(totalclusters){
   combined$clus <- cutree(clusters.c,totalclusters)
-  clu1 <- combined %>% filter(clus == 1)
-  clu2 <- combined %>% filter(clus == 2)
-  clu3 <- combined %>% filter(clus == 3)
-  clu4 <- combined %>% filter(clus == 4)
-  clu5 <- combined %>% filter(clus == 5)
-  clu6 <- combined %>% filter(clus == 6)
-  clu7 <- combined %>% filter(clus == 7)
-  clu8 <- combined %>% filter(clus == 8)
-  clu9 <- combined %>% filter(clus == 9)
-  clu10 <- combined %>% filter(clus == 10)
-  clu11 <- combined %>% filter(clus == 11)
-  
-  return(c(clu1<<-clu1,clu2<<-clu2,clu3<<-clu3,clu4<<-clu4,clu5<<-clu5,clu6<<-clu6,clu7<<-clu7,clu8<<-clu8,clu9<<-clu9,clu10<<-clu10,clu11<<-clu11))
+  clu <- list()
+  for( i in 1:totalclusters){
+    clu[[i]] <-  combined %>% filter(clus == i)
+  }
+  return(clu<<-clu)
 }
 
 ####-------------------------Function for Plotting & Summarizing Clusters-------------------------####
@@ -160,7 +154,7 @@ plot_clusters <- function (clusternumber){
   print(paste('Avg Sent Score:',mean(clusternumber$std.avgsscore)))
   print(paste('Avg Price/Bed:',mean(clusternumber$std.price_bed)))
   print(paste('Avg Rating:',mean(clusternumber$std.rating)))
-  print(paste('Avg Location Rating:',mean(clusternumber$std.rating_loc)))
+  print(paste('Avg Reviews/Month:',mean(clusternumber$std.reviews_month)))
   print(paste('Avg Number Reviews:',mean(clusternumber$std.reviews_count)))
   
 }
@@ -180,40 +174,42 @@ word_cloud <- function (clusternumber){
 
 ####--------------------------------RUN CLUSTERING FUNCTIONS---------------------------------####
 
-# Run create cluster function by inputting cluster name
-create_clusters(c_all)             # 8 clusters
-create_clusters(c_sentiment)       # 11 clusters
-create_clusters(c_sentiment2)      # 6 clusters
-create_clusters(c_rating)          # 5 clusters
-create_clusters(c_rating2)         # 6 clusters
-create_clusters(c_attract)         # 8 clusters
+# CHOOSE WHICH VARIABLES TO CLUSTER ON
+# View column names from "Combined"
+colnames(combined)
 
-# Run pruning function by inputting total number of clusters (up to 11)
+# Choose which variables by inputting index # from "Combined"
+c_all <- cbind(combined[,c(4:13,26:28, 30:32)])        # scaled(lat, lon, dist to attractions, price_bed, rating, sentiment, reviews_month)
+c1 <- cbind(combined[,c(26:28, 30:32)])                # scaled(lat, lon, price_bed, rating, sentiment, reviews_month)
+c2 <- cbind(combined[,c(2:3,28, 30:32)])               # lat, lon, scaled(price_bed, rating, sentiment, reviews_month)
+c3 <- cbind(combined[,c(2:3,28, 30,32)])               # lat, lon, scaled(price_bed, rating, reviews_month)
+
+
+# Run create cluster function by inputting cluster name
+create_clusters(c_all)             # 6 clusters
+create_clusters(c1)                # 8 clusters
+create_clusters(c2)                # 6 clusters
+create_clusters(c3)                # 7 clusters
+
+# Run optimal number of clusters using method "wss" by inputting cluster name
+optimal_clusters(c3)
+
+# Run pruning function by inputting total number of clusters
 prune_clusters(8)
 
-# Run plotting function by inputting the cluster number to plot on map
-plot_clusters(clu1)
-plot_clusters(clu2)
-plot_clusters(clu3)
-plot_clusters(clu4)
-plot_clusters(clu5)
-plot_clusters(clu6)
-plot_clusters(clu7)
-plot_clusters(clu8)
-plot_clusters(clu9)
-plot_clusters(clu10)
-plot_clusters(clu11)
+# Run plotting function by inputting the cluster number "clu[[#]]" to plot on map
+plot_clusters(clu[[1]])
+plot_clusters(clu[[2]])
+plot_clusters(clu[[3]])
+plot_clusters(clu[[4]])
+plot_clusters(clu[[5]])
+plot_clusters(clu[[6]])
+plot_clusters(clu[[7]])
+plot_clusters(clu[[8]])
+plot_clusters(clu[[9]])
 
-# Run word cloud function by inputting cluster number
-word_cloud(clu1)
-word_cloud(clu2)
-word_cloud(clu3)
-word_cloud(clu4)
-word_cloud(clu5)
-word_cloud(clu6)
-word_cloud(clu7)
-word_cloud(clu8)
-
+# Run word cloud function by inputting cluster number "clu[[#"]]
+word_cloud(clu[[1]])
 
 ##########################################################################################
 # MAPS
@@ -244,5 +240,5 @@ ggmap(map, extent = "device") + geom_point(aes(x=lon, y=lat),
 ####---------------------------Plot Attractions + Clusters on Map----------------------------####
 
 ggmap(map, extent="device") +
-  geom_point(data = clu4, aes(x=lon, y=lat), color = 'red', size = 2) +
+  geom_point(data = clu[[5]], aes(x=lon, y=lat), color = 'red', size = 2) +
   geom_point(data=attractions, aes(x=lon, y=lat), color = 'blue', size=4)
