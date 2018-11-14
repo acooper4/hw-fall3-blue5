@@ -183,19 +183,20 @@ c_all <- cbind(combined[,c(4:13,26:28, 30:32)])        # scaled(lat, lon, dist t
 c1 <- cbind(combined[,c(26:28, 30:32)])                # scaled(lat, lon, price_bed, rating, sentiment, reviews_month)
 c2 <- cbind(combined[,c(2:3,28, 30:32)])               # lat, lon, scaled(price_bed, rating, sentiment, reviews_month)
 c3 <- cbind(combined[,c(2:3,28, 30,32)])               # lat, lon, scaled(price_bed, rating, reviews_month)
-
+c4 <- cbind(combined[,c(2:3,28:30,31)])                # lat, lon, scaled(price_bed, #beds, rating, sent)
 
 # Run create cluster function by inputting cluster name
 create_clusters(c_all)             # 6 clusters
 create_clusters(c1)                # 8 clusters
 create_clusters(c2)                # 6 clusters
 create_clusters(c3)                # 7 clusters
+create_clusters(c4)                # 7 clusters
 
 # Run optimal number of clusters using method "wss" by inputting cluster name
-optimal_clusters(c3)
+optimal_clusters(c4)
 
 # Run pruning function by inputting total number of clusters
-prune_clusters(8)
+prune_clusters(7)
 
 # Run plotting function by inputting the cluster number "clu[[#]]" to plot on map
 plot_clusters(clu[[1]])
