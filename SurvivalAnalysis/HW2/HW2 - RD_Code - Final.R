@@ -81,6 +81,8 @@ plot(fit_exp, type = "cumhaz", ci = TRUE, conf.int = FALSE, las = 1, bty = "n",
      main = "Exponential Distribution", col = "blue")
 axis(1, seq(0,50,10), font=1)
 
+fit_exp
+
 #########Lognormal##########
 fit_lnorm <- flexsurvreg(Surv(hour, event = survive1 == 1) ~ backup + bridgecrane + servo + trashrack + elevation +
                            slope + age, data = flood, dist = "lognormal")
@@ -154,7 +156,7 @@ flood_noservo <- flood %>%
 
 # Now with that dataset, we need to find their new time
 results1 <- flood_noservo %>%
-  # Estimate their new linear predictor value if they had financial aid
+  # Estimate their new linear predictor value if they had a servo
   mutate(new_lp = predict(fit1, newdata = flood_noservo, type = "lp"),
          # now, keeping the same survival probability as before, get the time
          # corresponding to the new_lp value
@@ -187,4 +189,23 @@ mean(df_final$old_time) # average time of 27.5 hours before failing due to flood
 mean(df_final$new_time) # average time of 38 hours before failing after upgrading servo
 mean(df_final$pred_time_diff) # a 10.5 hour difference 
 
+write.csv(df_final, file = "df_final.csv")
 
+# Create survival curves for flooded pumps, survfit() takes a formula just like usual
+# ~ 1 to fit model with no predictors
+# Create data frame with just flooding rows
+flood2 <- flood[flood$reason == 1, ]
+# Create survival model for pumps with servo and those without 
+pump_fit <- survfit(Surv(time = hour, event = survive == 0) ~ servo, data = flood2)
+
+# Plot the survival curve for all flooding pumps 
+plot(pump_fit, xlab = "Time", ylab = "Survival Probability")
+# Better looking plot - Servo
+ggsurvplot(pump_fit, data = flood2,conf.int = TRUE, ggtheme = theme_bw(),
+           palette = "npg", legend.title = "Pumps Failed Due to Flooding", legend.labs = c("No Servo", "Servo"))
+
+# Backup 
+# Create survival model for pumps with backup and those without 
+pump_fit1 <- survfit(Surv(time = hour, event = survive == 0) ~ backup, data = flood2)
+ggsurvplot(pump_fit1, data = flood2,conf.int = TRUE, ggtheme = theme_bw(),
+           palette = "npg", legend.title = "Pumps Failed Due to Flooding", legend.labs = c("No Backup", "Backup"))
