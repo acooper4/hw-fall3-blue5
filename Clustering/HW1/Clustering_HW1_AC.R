@@ -6,6 +6,7 @@ library(readr)
 library(wordcloud)
 library(ggmap)
 library(factoextra)
+library(caret)
 
 ##########################################################################################
 # DATA PREPARATION
@@ -24,23 +25,28 @@ attractions <- read_csv("Clustering/HW1/attractions.csv")    # list of top 10 at
 
 ####---------------Create "listings_subset" with variables to cluster on--------------####
 
-# Coerce price into numeric type
-listings<-listings %>% mutate(newprice=as.numeric(gsub('[\\$,]','',price)))
+# Coerce data into correct data types
+listings<-listings %>% 
+  mutate(price2 = as.numeric(gsub('[\\$,]','',listings$price))) %>% 
+  mutate(host_response_rate2 = as.numeric(gsub('[\\%]','',listings$host_response_rate))) %>%
+  mutate(property_type2 = factor(listings$property_type,levels = c('Apartment','House','Condominium','Villa','Townhouse','Bed & Breakfast','Loft','Boat','Dorm','Other','NA'),labels = c(1,2,3,4,5,6,7,8,9,10,11))) %>%
+  mutate(room_type2 = factor(listings$room_type,levels = c('Private room','Entire home/apt','Shared room'),labels = c(1,2,3)))
 
-# Rename listing_k to listings_subset
-listings_subset <- listing_k2
-
-# Add price, #beds, price per bed, distance to attractions, rating, location rating, #reviews
-listings_subset <- listings_subset %>% 
-  mutate(price=listings$newprice, beds=listings$beds, price_bed=round(listings$newprice/beds,2)) %>%
+# Data subset
+listings_subset <- listing_k2 %>% 
+  mutate(price=listings$price2, beds=listings$beds, price_bed=round(listings$price2/beds,2)) %>%
   mutate(rating=listings$review_scores_rating, reviews_month=listings$reviews_per_month, reviews_count=listings$number_of_reviews) %>%
-  mutate(property_type=listings$property_type, room_type=listings$room_type, accommodates=listings$accommodates) %>%
+  mutate(property_type=listings$property_type2, room_type=listings$room_type2, accommodates=listings$accommodates) %>%
+  mutate(host_response_rate=listings$host_response_rate2, host_listing_count=listings$host_listings_count, bathrooms=listings$bathrooms, bedrooms=listings$bedrooms) %>%
   filter(!is.na(price_bed)) %>%               # remove null price/beds (removes 9 observations)
   filter(beds!=0) %>%                         # remove 0 beds (removes 4 observations)
-  filter(reviews_count>3)                     # at least 10 reviews (removes 2236 observations)
+  filter(reviews_count>3)                     # at least 3 reviews
+
+# Remove any nulls
+listings_subset <- na.omit(listings_subset)
 
 # Write to csv file
-# fwrite(listings_subset, "Clustering/HW1/listings_subset.csv")
+fwrite(listings_subset, "Clustering/HW1/listings_subset.csv")
 
 ####-----------------------------Explore Variables--------------------------------####
 
@@ -74,7 +80,7 @@ nwords <- new_reviews %>% group_by(listing_id) %>% count(listing_id)
 sentiment <- nwords %>% left_join(score,"listing_id") %>% mutate(avgsscore = sscore/n)
 
 # All averages are positive, so define bad reviews as something below average and standardize score
-sentiment$avgsscore <- scale(sentiment$avgsscore)
+# sentiment$avgsscore <- scale(sentiment$avgsscore)
 
 hist(sentiment$avgsscore)
 
@@ -82,27 +88,18 @@ hist(sentiment$avgsscore)
 
 # Add average scores to listings_subset
 combined <- listings_subset %>% left_join(sentiment,"listing_id")
-combined_original <- listings_subset %>% left_join(sentiment,"listing_id")
 
 # Scale variables
-combined$std.lat <- combined$lat
-combined$std.lon <- combined$lon
-combined$std.price_bed <- combined$price_bed
-combined$std.beds <- combined$beds
-combined$std.rating <- combined$rating
-combined$std.avgsscore <- combined$avgsscore
-combined$std.reviews_month <- combined$reviews_month
-combined$std.reviews_count <- combined$reviews_count
-combined$std.accommodates <- combined$accommodates
-combined <- combined %>%
-  mutate_at(vars(4:13,26:34), funs(scale))
+colnames(combined)
+combined_scale <- combined %>%
+  mutate_at(vars(4:19, 22:29), funs(scale))
 
 
 ##############################################################################################
 # HIERARCHICAL CLUSTERING FUNCTIONS
 ##############################################################################################
 
-####---------------------------Function for Creating Clusters-----------------------------####
+####-------------------Function for Creating Hierachical Clusters-------------------------####
 
 # Create function for creating clusters using hclust
 create_clusters <- function (clustername){
@@ -135,12 +132,132 @@ optimal_clusters <- function(clustername){
 
 # Create function to prune dendrogram
 prune_clusters <- function(totalclusters){
-  combined$clus <- cutree(clusters.c,totalclusters)
+  combined_scale$clus <- cutree(clusters.c,totalclusters)
   clu <- list()
   for( i in 1:totalclusters){
-    clu[[i]] <-  combined %>% filter(clus == i)
+    clu[[i]] <-  combined_scale %>% filter(clus == i)
   }
   return(clu<<-clu)
+}
+
+##########################################################################################
+# PCA -> CLUSTERING
+##########################################################################################
+
+####----------------------FUNCTION for PCA and Optimal Clusters-----------------------####
+
+# PCA > HIERARCHICAL
+pca_hclust <- function(data){
+  pc <- princomp(combined_pca)
+  pc$loadings
+  pc$center
+  pc$scores[1,]
+  
+  clusters.c<-hclust(dist(pc$scores),method="complete")
+  plot(clusters.c)
+  
+  # Optimal Cluster Number
+  plot(fviz_nbclust(pc$scores, complete_Clust, method = "wss"))
+
+  return(c(pc<<-pc))
+  
+}
+
+# PCA > KMEANS
+pca_kmeans <- function(data){
+  pc <- princomp(combined_pca)
+  pc$loadings
+  pc$center
+  pc$scores[1,]
+  
+  # Optimal Cluster Number
+  plot(fviz_nbclust(pc$scores, kmeans, method = "wss",k.max=20))     # 7 clusters
+  #fviz_nbclust(pc$scores, kmeans, method = "gap",k.max=20)
+  plot(fviz_nbclust(pc$scores, kmeans, method = "silhouette",k.max=20))
+  
+  return(pc<<-pc)
+  
+}
+
+####---------------------FUNCTION FOR CLUSTERING ON PC COMPONENTS-------------------####
+
+# PCA > HIERARCHICAL
+  pca_hclust_cluster <- function(df,clusternumber){
+    
+    # Cluster on PC Scores
+    means_pc <- colMeans(pc$scores)
+    pc$center
+    
+    # Scale PC Score
+    sd_pc    <- apply(pc$scores,2,sd)
+    sd_pc
+    pc$sdev
+    
+    df$clus <- cutree(hclust(dist(pc$scores),method="complete"),clusternumber)
+  
+    # Interpret Clusters
+    clu <- list()
+    for( i in 1:clusternumber){
+      clu[[i]] <-  df %>% filter(clus == i)
+    }
+    
+    # Find the means of each cluster to "Name them"
+    x <- cbind(colMeans(df))
+    y <- x
+    for (i in 1:clusternumber) {
+      x <- cbind(x,colMeans(clu[[i]])-y)
+    }
+    return(c(x<<-x, clu<<-clu))
+  }
+  
+  
+# PCA > KMEANS
+pca_kmeans_cluster <- function(df,clusternumber){
+  
+  # Cluster on PC Scores
+  means_pc <- colMeans(pc$scores)
+  pc$center
+  
+  # Scale PC scores
+  sd_pc    <- apply(pc$scores,2,sd)
+  sd_pc
+  pc$sdev
+  
+  # k means with n clusters
+  km <- kmeans(scale(pc$scores),clusternumber,nstart=25)
+  df$clus <- km$cluster
+  
+  # Interpret Clusters
+  clu <- list()
+  for( i in 1:clusternumber){
+    clu[[i]] <-  df %>% filter(clus == i)
+  }
+  
+  # Find the means of each cluster to "Name them"
+  x <- cbind(colMeans(df))
+  y <- x
+  for (i in 1:clusternumber) {
+    x <- cbind(x,colMeans(clu[[i]])-y)
+  }
+  return(c(x<<-x, clu<<-clu))
+}
+
+
+#####################################################################################################
+# VISUALIZE CLUSTERS
+#####################################################################################################
+
+####--------------------------Function for Generating Word Clouds---------------------------####
+
+# Create function to generate word cloud based on cluster number
+word_cloud <- function (clusternumber){
+  
+  words <- as.data.frame(new_reviews) %>% right_join(clusternumber,'listing_id') %>%
+    select(word) %>% count(word,sort=TRUE) %>% filter(n < 150)
+  set.seed(555)
+  wordcloud(words = words$word, freq = words$n, min.freq = 20,
+            max.words=100, random.order=FALSE, rot.per=0.35, 
+            colors=brewer.pal(8, "Paired"), scale=c(1,0.7))
 }
 
 ####-------------------------Function for Plotting & Summarizing Clusters-------------------------####
@@ -149,72 +266,14 @@ prune_clusters <- function(totalclusters){
 plot_clusters <- function (clusternumber){
   
   plot(ggmap(map, extent="device") +
-  geom_point(data = clusternumber, aes(x = lon, y = lat), color = 'red', size = 2))
-  #hist(clusternumber$avgsscore)
-  print(paste('Avg Sent Score:',mean(clusternumber$std.avgsscore)))
-  print(paste('Avg Price/Bed:',mean(clusternumber$std.price_bed)))
-  print(paste('Avg Rating:',mean(clusternumber$std.rating)))
-  print(paste('Avg Reviews/Month:',mean(clusternumber$std.reviews_month)))
-  print(paste('Avg Number Reviews:',mean(clusternumber$std.reviews_count)))
+    geom_point(data = clusternumber, aes(x = lon, y = lat), color = 'red', size = 2)) +
+    geom_point(data=attractions, aes(x=lon, y=lat), color = 'blue', size=4)
+  print(paste('Avg Sent Score:',mean(clusternumber$avgsscore)))
+  print(paste('Avg Price/Bed:',mean(clusternumber$price_bed)))
+  print(paste('Avg Rating:',mean(clusternumber$rating)))
+  print(paste('Avg Reviews/Month:',mean(clusternumber$reviews_month)))
   
 }
-
-####--------------------------Function for Generating Word Clouds---------------------------####
-
-# Create function to generate word cloud based on cluster number
-word_cloud <- function (clusternumber){
-
-  words <- as.data.frame(new_reviews) %>% right_join(clusternumber,'listing_id') %>%
-          select(word) %>% count(word,sort=TRUE) %>% filter(n < 150)
-  set.seed(555)
-  wordcloud(words = words$word, freq = words$n, min.freq = 20,
-          max.words=100, random.order=FALSE, rot.per=0.35, 
-          colors=brewer.pal(8, "Paired"), scale=c(1,0.7))
-}
-
-####--------------------------------RUN CLUSTERING FUNCTIONS---------------------------------####
-
-# CHOOSE WHICH VARIABLES TO CLUSTER ON
-# View column names from "Combined"
-colnames(combined)
-
-# Choose which variables by inputting index # from "Combined"
-c_all <- cbind(combined[,c(4:13,26:28, 30:32)])        # scaled(lat, lon, dist to attractions, price_bed, rating, sentiment, reviews_month)
-c1 <- cbind(combined[,c(26:28, 30:32)])                # scaled(lat, lon, price_bed, rating, sentiment, reviews_month)
-c2 <- cbind(combined[,c(2:3,28, 30:32)])               # lat, lon, scaled(price_bed, rating, sentiment, reviews_month)
-c3 <- cbind(combined[,c(2:3,28, 30,32)])               # lat, lon, scaled(price_bed, rating, reviews_month)
-c4 <- cbind(combined[,c(2:3,28:30,31)])                # lat, lon, scaled(price_bed, #beds, rating, sent)
-
-# Run create cluster function by inputting cluster name
-create_clusters(c_all)             # 6 clusters
-create_clusters(c1)                # 8 clusters
-create_clusters(c2)                # 6 clusters
-create_clusters(c3)                # 7 clusters
-create_clusters(c4)                # 7 clusters
-
-# Run optimal number of clusters using method "wss" by inputting cluster name
-optimal_clusters(c4)
-
-# Run pruning function by inputting total number of clusters
-prune_clusters(7)
-
-# Run plotting function by inputting the cluster number "clu[[#]]" to plot on map
-plot_clusters(clu[[1]])
-plot_clusters(clu[[2]])
-plot_clusters(clu[[3]])
-plot_clusters(clu[[4]])
-plot_clusters(clu[[5]])
-plot_clusters(clu[[6]])
-plot_clusters(clu[[7]])
-plot_clusters(clu[[8]])
-plot_clusters(clu[[9]])
-
-# Run word cloud function by inputting cluster number "clu[[#"]]
-word_cloud(clu[[1]])
-
-##########################################################################################
-# MAPS
-##########################################################################################
 
 ####--------------------------Heat Map of Listings in Boston------------------------####
 
@@ -230,16 +289,82 @@ ggmap(map, extent = "device") +
 
 ####-------------------------Dot Map of Price per Bed in Boston-------------------------####
 
-circle_size <- 0.015
-
 ggmap(map, extent = "device") + geom_point(aes(x=lon, y=lat), 
                                            data=listings_subset, col="purple", alpha=0.1,
-                                           size=listings_subset$price_bed*circle_size) +
+                                           size=listings_subset$price_bed*0.02) +
   scale_size_continuous(range=range(listings_subset$price_bed)) +
   ggtitle("Price per Bed of Airbnb Properties in Boston")
 
-####---------------------------Plot Attractions + Clusters on Map----------------------------####
 
+
+########################################################################################
+#---------------------------RUN FUNCTIONS STARTING HERE--------------------------------#
+########################################################################################
+
+####--------------------------RUN CLUSTERING FUNCTIONS------------------------------####
+
+####### OPTION 1 #######
+
+# CHOOSE WHICH VARIABLES TO CLUSTER ON
+# View column names from "Combined_Scale" or "Combined" (not scaled)
+colnames(combined_scale)
+
+# Choose which variables by inputting index # from df
+c_all <- cbind(combined_scale[,c(2:3,16:19,29)])
+
+# Run create cluster function by inputting cluster name
+create_clusters(c_all)             # 7 clusters
+
+# Run optimal number of clusters using method "wss" by inputting cluster name
+optimal_clusters(c_all)
+
+# Run pruning function by inputting total number of clusters
+prune_clusters(5)
+
+# Run plotting function by inputting the cluster number "clu[[#]]" to plot on map
+plot_clusters(clu[[1]])
+
+
+####### OPTION 2 #######
+
+# Use PCA to find the components of variation [everything except property, price, room type, n, sscore]
+colnames(combined)
+combined_pca <- combined[,-c(1,20:21,27:28)]
+
+# Run PCA > HClust
+pca_hclust(combined_pca)
+pca_hclust_cluster(combined_pca,4)
+x
+
+# Run PCA > Kmeans
+pca_kmeans(combined_pca)
+pca_kmeans_cluster(combined_pca,7)
+
+# View clusters
+x
+
+# Export clusters to csv
+fwrite(clu[[1]], "Clustering/HW1/kmeansclu1.csv")
+fwrite(clu[[2]], "Clustering/HW1/kmeansclu2.csv")
+fwrite(clu[[3]], "Clustering/HW1/kmeansclu3.csv")
+fwrite(clu[[4]], "Clustering/HW1/kmeansclu4.csv")
+fwrite(clu[[5]], "Clustering/HW1/kmeansclu5.csv")
+fwrite(clu[[6]], "Clustering/HW1/kmeansclu6.csv")
+fwrite(clu[[7]], "Clustering/HW1/kmeansclu7.csv")
+fwrite(rbind(clu[[1]],clu[[2]],clu[[3]],clu[[4]],clu[[5]],clu[[6]],clu[[7]]), "Clustering/HW1/kmeansclusters.csv")
+
+# Run word cloud function by inputting cluster number "clu[[#"]]
+word_cloud(clu[[1]])
+
+# Plot all clusters together
+point <- 0.02
 ggmap(map, extent="device") +
-  geom_point(data = clu[[5]], aes(x=lon, y=lat), color = 'red', size = 2) +
-  geom_point(data=attractions, aes(x=lon, y=lat), color = 'blue', size=4)
+  geom_point(data=attractions, aes(x=lon, y=lat), color = 'yellow', alpha=1, size=6) +
+  # geom_point(data = clu[[1]], aes(x = lon, y = lat), color = 'red', alpha=0.1, size = clu[[1]]$reviews_month*point) +
+  geom_point(data = clu[[2]], aes(x = lon, y = lat), color = 'purple', alpha=0.1, size = clu[[2]]$price_bed*point) +
+  geom_point(data = clu[[3]], aes(x = lon, y = lat), color = 'blue', alpha=0.1, size = clu[[3]]$price_bed*point) +
+  # geom_point(data = clu[[4]], aes(x = lon, y = lat), color = 'purple', alpha=0.1, size = clu[[4]]$reviews_month*point) +
+  # geom_point(data = clu[[5]], aes(x = lon, y = lat), color = 'red', alpha=0.1, size = clu[[5]]$reviews_month*point) +
+  # geom_point(data = clu[[6]], aes(x = lon, y = lat), color = 'yellow', alpha=0.1, size = clu[[6]]$reviews_month*point) +
+  # geom_point(data = clu[[7]], aes(x = lon, y = lat), color = 'orange', alpha=0.1, size = clu[[7]]$reviews_month*point) +
+  ggtitle("Airbnb Clusters by Price per Bed")
