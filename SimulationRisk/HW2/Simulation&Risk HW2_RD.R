@@ -79,11 +79,20 @@ set.seed(55043)
 # Simulate Seismic with normal distribution N(3,.35)
 # Seismic costs per section is $43,000
 seismic <-c()
+per_acre <- c()
 P0 <- 43000;
+A0 <- 960;
 for(i in 1:10000){
   Pt <- P0*(rnorm(n=1, mean=3, sd=.35))
   seismic[i]<- Pt
+  At <- A0*(rnorm(n=1, mean=600, sd=50))
+  per_acre[i]<- At
 }
+
+seismic <- P0*(rnorm(n=10000, mean=3, sd=.35))
+
+
+
 summary(seismic)
 df_seismic <- data.frame(seismic)
 
@@ -112,6 +121,8 @@ for(i in 1:10000){
 }
 summary(per_acre)
 df_per_acre <- data.frame(per_acre)
+
+seismic + per_acre
 
 # Create Histogram of simulated lease costs for year 0 using ggplot - Normal
 ggplot(df_per_acre, aes(x=per_acre)) + 
@@ -218,6 +229,98 @@ expense <- cbind(df_seismic, df_per_acre, df_completion, df_salary)
 
 # NPV <-  -intitial costs + FNRevenue*(1+WACC)^-1 + FNRevenue*(1+WACC)^-2 + .... all the way to 15 years 
 
+# Calculate the initial costs 
+#totalcost_2019 <- numeric()
+#for(i in 1:10000) {
+#  seismic <- 43000*rnorm(n=1,mean=3, sd=.35)
+#  lease <- 960*rnorm(n=1, mean=600, sd=50)
+#  salary  <- rtriangle(n=1, a=172000, b=279500, c=215000)
+#  totalcost <- seismic + lease + salary
+#  totalcost_2019[i] <- totalcost
+#}
+
+#-------------------------------------------------YEAR 0 INITIAL COSTS------------------------------------------
+# Need to bring in drilling costs from HW 1
+# P0 0 initial value (2006)
+set.seed(55043)
+P0 <- 2279.8
+drillcost <-c()
+#Normal distribution + triangle Simulation
+for(i in 1:100000){
+  P0 <- 2279.8; 
+  Pt <- P0*(1+rnorm(n=1, mean=.1314913, sd=.1784372))
+  for (j in 1:5) {
+    Pt <- Pt*(1+rnorm(n=1, mean=.1314913, sd=.1784372))^j
+  } 
+  for(k in 1:3) {
+    Pt <- Pt*(1-rtriangle(1, a=.07, b=.22, c = .0917))
+  } 
+  for(l in 1:3){
+    Pt <- Pt*(1+rtriangle(1, a=.02, b=.06, c =.05))
+  }
+  drillcost[i]<- Pt
+}
+
+# Quick Histogram of drill cost distribution
+hist(drillcost, breaks=600, xlim=c(0,150000))
+abline(v = 2279.8, col="red", lwd=2)
+
+# Create a vector with other initial costs (seismic, lease, complete, salary/overhead)
+seismic <- 43000*rnorm(n=100000,mean=3, sd=.35)
+lease <- 960*rnorm(n=100000, mean=600, sd=50)
+complete <- rnorm(n=100000, mean=390000, sd=50000)
+salary  <- rtriangle(n=100000, a=172000, b=279500, c=215000)
+
+# Combine all costs (including drill cost from HW1) into one vector
+initialcost <- seismic + lease + complete + 15*salary + drillcost
+# See it as a data frame 
+initialcost_df <- data.frame(initialcost)
+
+# Quick histogram showing distribution of initital costs
+hist(initialcost, breaks = 50)
+
+mean(initialcost)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+#--------------------------------------------CODING WORK------------------------------------------------------
+# Round values so that they are whole numbers, in order to do so we need to convert to data.frame 
+drillcost_df <- as.data.frame(drillcost)
+drillcost_df <- round(drillcost_df$drillcost)
+drillcost_df <- as.data.frame(drillcost_df)
+
+# Create Histogram of simulated costs for 2019 using ggplot - Normal
+ggplot(drillcost_df, aes(x=drillcost)) + 
+  geom_histogram(binwidth=2500,color="black", fill="white") +
+  geom_vline(aes(xintercept=2279.8), color="red", linetype="dashed", size=.6) +
+  scale_x_continuous(labels = scales::comma) +
+  labs(x = "Average Drilling Cost $") +
+  labs(y = "Counts") +
+  labs(title = "Simulation of Drilling Costs for 2019") +
+  theme(
+    plot.title = element_text(color="black", size=14, face="bold",family="Times New Roman"),
+    axis.title.x = element_text(color="#993333", size=14, face="bold",family="Times New Roman"),
+    axis.title.y = element_text(color="#993333", size=14, face="bold",family="Times New Roman"),
+    plot.subtitle = element_text(color="black", size=12, face="bold",family="Times New Roman")
+  )
+
+
+
+
+
 
 
 #-----------------------------------------------REVENUE RISK-----------------------------------------------------
@@ -226,17 +329,29 @@ price <- read_excel("/Users/rogerdugas/Desktop/MSA NC State/1.2 Fall 3/Simulatio
                     sheet=1, col_names = TRUE, skip=2)
 
 # Only look at next 15 years
-price <- subset(price[1:15,])
+price <- price[1:15,]
 
 #Set number of runs
 runs <-10000 
 
 #Create an empty matrix to contain the simulations
 df_price <- matrix(nrow=runs,ncol=length(price$Year)) 
-for (i in 1:length(price$Year))
-{df_price[,i]<-rtriangle(n=runs,price$`Low Oil Price`[i],price$`High Oil Price`[i],price$`AEO2018 Reference`[i]) } 
+for (i in 1:length(price$Year)){
+  df_price[,i]<-rtriangle(n=runs,price$`Low Oil Price`[i],price$`High Oil Price`[i],price$`AEO2018 Reference`[i])
+  df_price[,i] <- df_price[,i]*(1+.1)^-(i-1)
+} 
 #Fill the matrix
 df_price <- data.frame(df_price) #append the matrix with the row sums
+
+Revenueyear0 <- rowSums(df_price)
+df_price$X2 * (1+.1)^-1
+
+
+
+
+
+
+
 
 # Our model represents a typical West Texas scenario with an
 # assumed NRI distributed Normally with a mean of 75% and a standard deviation of 2%. This
@@ -274,80 +389,13 @@ hist(exp, breaks = 50)
 
 
 
+#------------------------------------------COST OF A SINGLE DRY WELL------------------------------------------
+# Cost of a dry well 
+# Drilling costs, Seismic, Lease, Salary just for Year 0
+Drywell_cost <- drillcost + seismic + lease + salary
 
+hist(Drywell_cost, breaks=100, xlim = c(700000,1500000))
+mean(Drywell_cost) # Average cost of a drywell will be $947,139
 
-
-
-
-
-#--------------------------------------------------LAST REPORT CODE-------------------------------------------------------
-# Set the Seed
-set.seed(55043)
-
-# P0 0 initial value (2006)
-P0 <- 2279.8
-
-set.seed(55043)
-P_2019 <-c()
-#Normal distribution + triangle Simulation
-for(i in 1:10000){
-  P0 <- 2279.8; 
-  Pt <- P0*(1+rnorm(n=1, mean=.1314913, sd=.1784372))
-  for (j in 1:5) {
-    Pt <- Pt*(1+rnorm(n=1, mean=.1314913, sd=.1784372))^j
-  }
-  for(k in 1:3) {
-    Pt <- Pt*(1-rtriangle(1, a=.07, b=.22, c = .0917))
-  }
-  for(l in 1:3){
-    Pt <- Pt*(1+rtriangle(1, a=.02, b=.06, c =.05))
-  }
-  P_2019[i]<- Pt
-}
-
-###### Zach's histogram #######
-hist(P_2019, breaks=300, xlim=c(0,150000))
-abline(v = 2279.8, col="red", lwd=2)
-
-# Round values so that they are whole numbers, in order to do so we need to convert to data.frame 
-P_2019_df <- as.data.frame(P_2019)
-P_2019_df <- round(P_2019_df$P_2019)
-P_2019_df <- as.data.frame(P_2019_df)
-
-# Create Histogram of simulated costs for 2019 using ggplot - Normal
-ggplot(P_2019_df, aes(x=P_2019)) + 
-  geom_histogram(binwidth=2500,color="black", fill="white") +
-  geom_vline(aes(xintercept=2279.8), color="red", linetype="dashed", size=.6) +
-  geom_vline(aes(xintercept=10650), color="blue", linetype="dashed", size=.6) +
-  geom_vline(aes(xintercept=127844), color="green", linetype="dashed", size=.6) +
-  scale_x_continuous(labels = scales::comma) +
-  labs(x = "Average Drilling Cost $") +
-  labs(y = "Counts") +
-  labs(title = "Simulation of Drilling Costs for 2019") +
-  theme(
-      plot.title = element_text(color="black", size=14, face="bold",family="Times New Roman"),
-      axis.title.x = element_text(color="#993333", size=14, face="bold",family="Times New Roman"),
-      axis.title.y = element_text(color="#993333", size=14, face="bold",family="Times New Roman"),
-      plot.subtitle = element_text(color="black", size=12, face="bold",family="Times New Roman")
-)
-
-
-# Bandwidth to use for a distribution of returns
-density(data_vector, bw="SJ-ste") #bandwidth = .07935
-K_2019 <-c()
-#Kernel Simulation
-for(i in 1:10000){
-  P0 <- 2279.8;
-  Kt <- P0*(1+ rkde(fhat=kde(data_vector, h=.07935), n=1))
-  for (j in 1:5) {
-    Kt <- P0*(1+ rkde(fhat=kde(data_vector, h=.07935), n=1))^j
-  }
-  for(k in 1:3) {
-    Kt <- Kt*(1-rtriangle(1, a=.07, b=.22, c = .0917))
-  }
-  for(l in 1:3){
-    Kt <- Kt*(1+rtriangle(1, a=.02, b=.06, c =.05))
-  }
-  K_2019[i] <- Kt
-}
+#-------------------------------------------NPV OF SINGLE WET WELL-------------------------------------------
 
