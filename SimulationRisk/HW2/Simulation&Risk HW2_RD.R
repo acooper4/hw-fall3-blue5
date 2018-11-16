@@ -1,6 +1,6 @@
 # Simulation & Risk HW2
 # Blue Team 5 Fall 3
-# Created on 11/12/2018 - Roger Dugas
+# Created on 11/12/2018 - Blue Team 5
 
 ####### HW2 ASSIGNEMENT #########
 # Compagnie Pétrolière et Gazière, INC. (hereafter the “Company”), acting by and through its department of 
@@ -29,7 +29,7 @@ library(scales)
 #######################SET-UP STEPS#######################
 ##########################################################
 # 1. Please select the amount of simulations to use:   ###
-runs <- 100000                                          ###
+runs <- 100000                                         ###
 # 2. The first section of this script is from the HW1, ###
 # the second section is HW2                            ###
 # 3. Please select the seed                            ###
@@ -116,6 +116,11 @@ for(i in 1:runs) {
   drilling.2019[i] <- drilling.t
 }
 
+mean(data_vector)
+sd(data_vector)
+
+
+
 hist(drilling.2019, breaks = 50, 
   main = "Estimated Distribution of 2019 Drilling Costs - Normal",
   xlab = "Drilling Costs ($ in Thousands)")
@@ -132,19 +137,21 @@ summary(seismic)
 df_seismic <- data.frame(seismic)
 
 # Create Histogram of simulated seismic costs for year 0 using ggplot - Normal
-#ggplot(df_seismic, aes(x=seismic)) + 
-#  geom_histogram(binwidth=2500,color="black", fill="white") +
-#  geom_vline(aes(xintercept=mean(df_seismic$seismic)), color="red", linetype="dashed", size=1) +
-#  scale_x_continuous(labels = scales::comma) +
-#  labs(x = "Seismic Cost per Well $") +
-#  labs(y = "Counts") +
-#  labs(title = "Simulation of Seismic Costs per Well for Year 0") +
-#  theme(
-#    plot.title = element_text(color="black", size=14, face="bold",family="Times New Roman"),
-#    axis.title.x = element_text(color="#993333", size=14, face="bold",family="Times New Roman"),
-#    axis.title.y = element_text(color="#993333", size=14, face="bold",family="Times New Roman"),
-#    plot.subtitle = element_text(color="black", size=12, face="bold",family="Times New Roman")
-#)
+ggplot(df_seismic, aes(x=seismic)) + 
+  geom_histogram(binwidth=2500,color="black", fill="white") +
+  geom_vline(aes(xintercept=mean(df_seismic$seismic)), color="red", linetype="solid", size=1) +
+  #scale_x_continuous(labels = scales::comma) +
+  scale_x_continuous(breaks=seq(0,200000,25000), labels = comma)+
+  labs(x = "Seismic Cost per Well $") +
+  labs(y = "Counts") +
+  labs(title = "Simulation of Seismic Costs per Well") +
+  annotate("text", label ="Mean of $128,952", x = 160000, y = 6000, color = "red") +
+  theme(
+    plot.title = element_text(color="black", size=14, face="bold",family="Arial"),
+    axis.title.x = element_text(color="dark blue", size=14, face="bold",family="Arial"),
+    axis.title.y = element_text(color="dark blue", size=14, face="bold",family="Arial"),
+    plot.subtitle = element_text(color="black", size=12, face="bold",family="Arial") 
+)
 
 #-----------------------------------------------------LEASE COST-----------------------------------------------
 # Simulate acres per well with normal distribution N(600,50)
@@ -154,19 +161,21 @@ summary(lease)
 df_lease <- data.frame(lease)
 
 # Create Histogram of simulated lease costs for year 0 using ggplot - Normal
-#ggplot(df_lease, aes(x=lease)) + 
-#  geom_histogram(binwidth=5000,color="black", fill="white") +
-#  geom_vline(aes(xintercept=mean(df_lease$lease)), color="red", linetype="dashed", size=1) +
-#  scale_x_continuous(labels = scales::comma) +
-#  labs(x = "Lease Cost per Well $") +
-#  labs(y = "Counts") +
-#  labs(title = "Simulation of Lease Cost per Well for Year 0") +
-#  theme(
-#    plot.title = element_text(color="black", size=14, face="bold",family="Times New Roman"),
-#    axis.title.x = element_text(color="#993333", size=14, face="bold",family="Times New Roman"),
-#    axis.title.y = element_text(color="#993333", size=14, face="bold",family="Times New Roman"),
-#    plot.subtitle = element_text(color="black", size=12, face="bold",family="Times New Roman")
-#)
+ggplot(df_lease, aes(x=lease)) + 
+  geom_histogram(binwidth=7000,color="black", fill="white") +
+  geom_vline(aes(xintercept=mean(df_lease$lease)), color="red", linetype="solid", size=1) +
+  #scale_x_continuous(labels = scales::comma) +
+  scale_x_continuous(breaks=seq(300000,800000,100000), labels = comma)+
+  labs(x = "Lease Cost per Well $") +
+  labs(y = "Counts") +
+  labs(title = "Simulation of Lease Costs per Well") +
+  annotate("text", label ="Mean of $576,134", x =650000, y = 6000, color = "red") +
+  theme(
+    plot.title = element_text(color="black", size=14, face="bold",family="Arial"),
+    axis.title.x = element_text(color="dark blue", size=14, face="bold",family="Arial"),
+    axis.title.y = element_text(color="dark blue", size=14, face="bold",family="Arial"),
+    plot.subtitle = element_text(color="black", size=12, face="bold",family="Arial") 
+  )
 
 #---------------------------------------------------COMPLETION COST-----------------------------------------------
 # We hypothesize that his cost is Normally distributed with a mean of $390,000 and a standard deviation of $50,000.
@@ -175,20 +184,22 @@ summary(complete)
 df_complete <- data.frame(complete)
 hist(complete, breaks = 50)
 
-# Create Histogram of simulated completion costs for year 0 using ggplot
-#ggplot(df_complete, aes(x=complete)) + 
-#  geom_histogram(binwidth=5000,color="black", fill="white") +
-#  geom_vline(aes(xintercept=mean(df_complete$complete)), color="red", linetype="dashed", size=1) +
-#  scale_x_continuous(labels = scales::comma) +
-#  labs(x = "Completion Costs per Well $") +
-#  labs(y = "Counts") +
-#  labs(title = "Simulation of Completion Cost per Well") +
-#  theme(
-#    plot.title = element_text(color="black", size=14, face="bold",family="Times New Roman"),
-#    axis.title.x = element_text(color="#993333", size=14, face="bold",family="Times New Roman"),
-#    axis.title.y = element_text(color="#993333", size=14, face="bold",family="Times New Roman"),
-#    plot.subtitle = element_text(color="black", size=12, face="bold",family="Times New Roman")
-#)
+# Create Histogram of simulated completion costs using ggplot
+ggplot(df_complete, aes(x=complete)) + 
+  geom_histogram(binwidth=6000,color="black", fill="white") +
+  geom_vline(aes(xintercept=mean(df_complete$complete)), color="red", linetype="solid", size=1) +
+  #scale_x_continuous(labels = scales::comma) +
+  scale_x_continuous(breaks=seq(120000,700000,100000), labels = comma)+
+  labs(x = "Completion Cost per Well $") +
+  labs(y = "Counts") +
+  labs(title = "Simulation of Completion Costs per Well") +
+  annotate("text", label ="Mean of $389,873", x =475000, y = 6000, color = "red") +
+  theme(
+    plot.title = element_text(color="black", size=14, face="bold",family="Arial"),
+    axis.title.x = element_text(color="dark blue", size=14, face="bold",family="Arial"),
+    axis.title.y = element_text(color="dark blue", size=14, face="bold",family="Arial"),
+    plot.subtitle = element_text(color="black", size=12, face="bold",family="Arial") 
+  )
 
 #--------------------------------------------------PROFESSIONAL OVERHEAD--------------------------------------------
 # We believe the salary and benefit cost is best represented by a triangular distribution,
@@ -200,19 +211,21 @@ df_salary <- data.frame(salary)
 hist(salary, breaks = 50)
 
 # Create Histogram of simulated professional overhead using ggplot
-#ggplot(df_salary, aes(x=salary)) + 
-#  geom_histogram(binwidth=5000,color="black", fill="white") +
-#  geom_vline(aes(xintercept=mean(df_salary$salary)), color="red", linetype="dashed", size=1) +
-#  scale_x_continuous(labels = scales::comma) +
-#  labs(x = "Professional Overhead Costs per Well $") +
-#  labs(y = "Counts") +
-#  labs(title = "Simulation of Professional Overhead Cost per Well") +
-#  theme(
-#    plot.title = element_text(color="black", size=14, face="bold",family="Times New Roman"),
-#    axis.title.x = element_text(color="#993333", size=14, face="bold",family="Times New Roman"),
-#    axis.title.y = element_text(color="#993333", size=14, face="bold",family="Times New Roman"),
-#    plot.subtitle = element_text(color="black", size=12, face="bold",family="Times New Roman")
-#  )
+ggplot(df_salary, aes(x=salary)) + 
+  geom_histogram(binwidth=3000,color="black", fill="white") +
+  geom_vline(aes(xintercept=mean(df_salary$salary)), color="red", linetype="solid", size=1) +
+  #scale_x_continuous(labels = scales::comma) +
+  scale_x_continuous(breaks=seq(100000,350000,25000), labels = comma)+
+  labs(x = "Professional Overhead Cost per Well $") +
+  labs(y = "Counts") +
+  labs(title = "Simulation of Professional Overhead Costs per Well") +
+  annotate("text", label ="Mean of $222,252", x =250000, y = 5000, color = "red") +
+  theme(
+    plot.title = element_text(color="black", size=14, face="bold",family="Arial"),
+    axis.title.x = element_text(color="dark blue", size=14, face="bold",family="Arial"),
+    axis.title.y = element_text(color="dark blue", size=14, face="bold",family="Arial"),
+    plot.subtitle = element_text(color="black", size=12, face="bold",family="Arial") 
+  )
 
 #----------------------------------------------PRODUCTION RISK--------------------------------------------------
 # The IP’s follow a Lognormal distribution with a mean of 420 BOPD and a standard deviation of 120 BOPD.
@@ -370,7 +383,44 @@ PV_rev <- rev_after_tax
 Drywell_cost <- 1000*drilling.2019 + seismic + lease + salary
 
 hist(Drywell_cost, breaks=100)
-mean(Drywell_cost) # Average cost of a drywell will be ~$947,139
+
+# Create data frame 
+df_dry <- data.frame(Drywell_cost)
+summary(Drywell_cost)
+
+# Create histogram of simulated cost of a single dry well
+ggplot(df_dry, aes(x=Drywell_cost)) + 
+  geom_histogram(binwidth=200000,color="black", fill="white") +
+  geom_vline(aes(xintercept=mean(df_dry$Drywell_cost)), color="red", linetype="solid", size=1) +
+  #scale_x_continuous(labels = scales::comma) +
+  scale_x_continuous(breaks=seq(1000000,17000000,4000000), labels = comma)+
+  labs(x = "Cost per Dry Well $") +
+  labs(y = "Counts") +
+  labs(title = "Simulated Cost of per Dry Well") +
+  annotate("text", label ="Mean of $4.46M", x =6500000, y = 6000, color = "red") +
+  theme(
+    plot.title = element_text(color="black", size=14, face="bold",family="Arial"),
+    axis.title.x = element_text(color="dark blue", size=14, face="bold",family="Arial"),
+    axis.title.y = element_text(color="dark blue", size=14, face="bold",family="Arial"),
+    plot.subtitle = element_text(color="black", size=12, face="bold",family="Arial") 
+  )
+
+# Some statistics 
+mean(Drywell_cost) # Average cost of a drywell will be ~4.44M
+median(Drywell_cost) # Median cost of a drywell will be ~4.24M
+max(Drywell_cost) # Max of $15.34M
+min(Drywell_cost) # Min of $1.16M
+
+# Inter quartile range for NPV
+table_dry <- c(quantile(Drywell_cost, .05),
+               quantile(Drywell_cost, .25),
+               quantile(Drywell_cost, .75),
+               quantile(Drywell_cost, .50),
+               quantile(Drywell_cost, .90),
+               quantile(Drywell_cost, .95),
+               quantile(Drywell_cost, .99))
+
+table_df_dry <- data.frame(table_dry)
 
 #-------------------------------------------NPV OF SINGLE WET WELL-------------------------------------------
 # Calculate the Net Present Value for the simulated wells
@@ -383,12 +433,52 @@ for(i in 1:15) {
 # Calculate the initial cost
 initial_cost <- 1000*drilling.2019 + seismic + lease + 15*salary + complete
 
+# Sum 15 discounted years to calculate the Present Value 
 Total_PV_rev <-  rowSums(PV_rev)
 
 # Make the costs a cash outflow (negative)
 initial_cost <- initial_cost *-1
 
+# Calculates NPV 
 NPV = initial_cost + Total_PV_rev
-mean(NPV)
-max(NPV)
-min(NPV)
+
+hist(NPV)
+
+# Create data frame of NPV
+NPV_df <- data.frame(NPV)
+summary(NPV)
+
+# Create histogram of simulated NPV of a single wet well
+ggplot(NPV_df, aes(x=NPV)) + 
+  geom_histogram(binwidth=450000,color="black", fill="white") +
+  geom_vline(aes(xintercept=mean(NPV_df$NPV)), color="red", linetype="solid", size=1) +
+  #scale_x_continuous(labels = scales::comma) +
+  scale_x_continuous(breaks=seq(-3000000,33000000,5000000), labels = comma)+
+  labs(x = "NPV per Wet Well $") +
+  labs(y = "Counts") +
+  labs(title = "Simulated Net Present Value (NPV) per Wet Well") +
+  annotate("text", label ="Mean of $12.04M", x =17000000, y = 6000, color = "red") +
+  theme(
+    plot.title = element_text(color="black", size=14, face="bold",family="Arial"),
+    axis.title.x = element_text(color="dark blue", size=14, face="bold",family="Arial"),
+    axis.title.y = element_text(color="dark blue", size=14, face="bold",family="Arial"),
+    plot.subtitle = element_text(color="black", size=12, face="bold",family="Arial") 
+  )
+
+# Some Statistics 
+mean(NPV) # Mean NPV of $12.04M
+median(NPV)# Median NPV of $11.8M
+max(NPV) # Max NPV of $32M
+min(NPV) # Min NPV of $-2.94
+
+# Inter quartile range for NPV
+table <- c(quantile(NPV, .05),
+           quantile(NPV, .25),
+           quantile(NPV, .75),
+           quantile(NPV, .50),
+           quantile(NPV, .90),
+           quantile(NPV, .95),
+           quantile(NPV, .10))
+
+table_df <- data.frame(table)
+
