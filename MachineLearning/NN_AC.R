@@ -55,11 +55,11 @@ n <- names(train_t.s)
 f <- as.formula(paste("target ~", paste(n[!n %in% "target"], collapse = " + ")))
 
 # Neural network with 2 hidden layers
-nn <- neuralnet(f, data=train_t.s, hidden=c(6,3), linear.output=T)
+nn <- neuralnet(f, data=train_t.s, hidden=c(5,3), linear.output=T)
 plot(nn)
 
 # Predictions for the train_v.s set
-train_v_pred <- compute(nn, train_v.s[,1:85])        # non encoded cat vars
+#train_v_pred <- compute(nn, train_v.s[,1:85])        # non encoded cat vars
 train_v_pred <- compute(nn, train_v.s[,1:100])       # encoded cat vars
 
 # Unscale the values
